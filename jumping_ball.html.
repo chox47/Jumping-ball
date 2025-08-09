@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jumping Ball Game</title>
+    <style>
+        body { margin: 0; background: #f0f0f0; overflow: hidden; }
+        canvas { background: white; display: block; margin: auto; border: 2px solid black; }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="400"></canvas>
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let ball = { x: 100, y: 300, radius: 20, vy: 0, gravity: 0.6, jumpPower: -12, onGround: true };
+    let obstacles = [];
+    let coins = [];
+    let obstacleWidth = 30, obstacleHeight = 50;
+    let coinRadius = 10;
+    let speed = 5, score = 0, gameOver = false;
+    let highScore = localStorage.getItem("highScore") || 0;
+
+    function spawnObstacle() {
+        obstacles.push({ x: canvas.width, y: canvas.height - obstacleHeight - 20 });
+        // 50% chance to spawn a coin above it
+        if (Math.random() < 0.5) {
+            coins.push({ x: canvas.width + obstacleWidth / 2, y: canvas.height - obstacleHeight - 60 });
+        }
+    }
+
+    function update() {
+        if (gameOver) return;
+
+        // Ball movement
+        ball.y += ball.vy;
+        ball.vy += ball.gravity;
+
+        if (ball.y >= canvas.height - ball.radius - 20) {
+            ball.y = canvas.height - ball.radius - 20;
+            ball.vy = 0;
+            ball.onGround = true;
+        }
+
+        // Obstacles
+        if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < canvas.width - 300) {
+            spawnObstacle();
+        }
+
+        obstacles.forEach(obs => obs.x -= speed);
+        coins.forEach(c => c.x -= speed);
+
+        obstacles = obstacles.filter(obs => obs.x + obstacleWidth > 0);
+        coins = coins.filter(c => c.x + coinRadius > 0);
+
+        // Collision detection with obstacles
+        for (let obs of obstacles) {
+            if (ball.x + ball.radius > obs.x && ball.x - ball.radius < obs.x + obstacleWidth &&
+                ball.y + ball.radius > obs.y) {
+                gameOver = true;
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem("highScore", highScore);
+                }
+            }
+        }
+
+        // Collision with coins
+        for (let i = coins.length - 1; i >= 0; i--) {
+            let c = coins[i];
+            let dx = ball.x - c.x;
+            let dy = ball.y - c.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < ball.radius + coinRadius) {
+                score += 50; // Bonus for coin
+                coins.splice(i, 1);
+            }
+        }
+
+        // Increase difficulty
+        speed += 0.001;
+        score++;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Ball
+        ctx.fillStyle = "black";
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Obstacles
+        ctx.fillStyle = "red";
+        obstacles.forEach(obs => ctx.fillRect(obs.x, obs.y, obstacleWidth, obstacleHeight));
+
+        // Coins
+        ctx.fillStyle = "gold";
+        coins.forEach(c => {
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, coinRadius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Score
+        ctx.fillStyle = "black";
+        ctx.font = "20px Arial";
+        ctx.fillText("Score: " + score, 10, 30);
+        ctx.fillText("High Score: " + highScore, 10, 60);
+
+        // Game over message
+        if (gameOver) {
+            ctx.font = "40px Arial";
+            ctx.fillText("Game Over!", 300, 180);
+            ctx.font = "20px Arial";
+            ctx.fillText("Press Space to Restart", 300, 220);
+        }
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener("keydown", e => {
+        if (e.code === "Space" && ball.onGround && !gameOver) {
+            ball.vy = ball.jumpPower;
+            ball.onGround = false;
+        }
+        if (gameOver && e.code === "Space") {
+            // Restart game
+            obstacles = [];
+            coins = [];
+            score = 0;
+            speed = 5;
+            ball.y = 300;
+            ball.vy = 0;
+            ball.onGround = true;
+            gameOver = false;
+        }
+    });
+
+    gameLoop();
+</script>
+</body>
+</html>
